@@ -1,0 +1,15 @@
+{
+    "github.copilot.enable": {
+        "*": true,
+        "plaintext": false,
+        "markdown": false,
+        "scminput": false
+    },
+    "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": false,
+    "editor.tabSize": 4, 
+    "editor.detectIndentation": false, 
+    "editor.insertSpaces": true, 
+    "prettier.tabWidth": 4
+}

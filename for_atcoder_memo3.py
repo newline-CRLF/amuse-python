@@ -2,14 +2,14 @@ import sys
 import math
 from typing import List, Tuple, Set
 
-# 浮動小数点数の比較用定数
+# Constants for floating point comparisons
 EPS = 1e-9 
 TAKE_THRESHOLD = 1.0 - 1e-6 
 
 class PaintMixer:
     def __init__(self):
         self.N = 0
-        self.K = 0
+        self.K = 0  # Number of tube paints
         self.H = 0
         self.T = 0
         self.D = 0
@@ -22,27 +22,27 @@ class PaintMixer:
         self.wells = {} 
         self.cell_to_well = {} 
         
-        # 新規: 井戸の設定（サイズと境界）を保存
-        self.well_configs: List[Tuple[int, int, int, int, int]] = []  # (well_id, start_i, end_i, start_j, end_j)
+        # New: Store well configurations (size and bounds)
+        self.well_configs: List[Tuple[int, int, int, int, int]] = [] # (well_id, start_i, end_i, start_j, end_j)
         self.total_wells = 0
         
         self.operations: List[str] = []
         self.turns_used = 0
         self.paint_taken_count = 0
         
-        self.well_usage: List[bool] = [] # 井戸使用状況 (True = 使用中, False = 空き)
-        self.well_last_target_idx: List[int] = [] # 最後にこの井戸を使用したターゲットのインデックス
+        self.well_usage: List[bool] = [] 
+        self.well_last_target_idx: List[int] = [] 
 
         self.EPS = EPS
         self.TAKE_THRESHOLD = TAKE_THRESHOLD
-        self.REUSE_DIST_THRESHOLD = 0.15  # 井戸再利用のための固定閾値
+        self.REUSE_DIST_THRESHOLD = 0.15 # Fixed threshold for reusing wells
 
     def read_input(self):
         line = sys.stdin.readline().split()
         self.N, self.K, self.H, self.T, self.D = map(int, line)
         
-        # total_wells決定後に井戸使用状況と最後のターゲットインデックスの配列を初期化する
-        # これはinitialize_palette内で行われる
+        # Initialize well usage and last_target_idx arrays after total_wells is determined
+        # This will be done in initialize_palette now.
         
         for _ in range(self.K):
             c, m, y = map(float, sys.stdin.readline().split())
@@ -50,14 +50,14 @@ class PaintMixer:
         
         for _ in range(self.H):
             c, m, y = map(float, sys.stdin.readline().split())
-            self.targets.append((c, m, y))
-
-    # get_well_boundsは固定井戸サイズに基づかず、well_configsから取得する
+            self.targets.append(tuple(map(float, sys.stdin.readline().split())))
+    
+    # get_well_bounds will no longer be fixed to well_size. Instead, it will retrieve from well_configs
     def get_well_bounds(self, well_id: int) -> Tuple[int, int, int, int]:
         for config in self.well_configs:
             if config[0] == well_id:
                 return config[1], config[2], config[3], config[4]
-        raise ValueError(f"井戸ID {well_id} は設定に存在しません。")
+        raise ValueError(f"Well ID {well_id} not found in configurations.")
 
     def initialize_palette(self):
         self.v_walls = [[0 for _ in range(self.N - 1)] for _ in range(self.N)]
@@ -65,7 +65,7 @@ class PaintMixer:
         
         current_well_id = 0
 
-        # Region A: (0,0) から (11,11) → 3x3の井戸
+        # Region A: (0,0) to (11,11) -> 3x3 wells
         region_A_size = 3
         for r_offset in range(0, 12, region_A_size):
             for c_offset in range(0, 12, region_A_size):
@@ -74,7 +74,7 @@ class PaintMixer:
                 self.well_configs.append((current_well_id, start_i, end_i, start_j, end_j))
                 current_well_id += 1
 
-        # Region B: (0,12) から (11,19) → 4x4の井戸
+        # Region B: (0,12) to (11,19) -> 4x4 wells
         region_B_size = 4
         for r_offset in range(0, 12, region_B_size):
             for c_offset in range(12, 20, region_B_size):
@@ -83,7 +83,7 @@ class PaintMixer:
                 self.well_configs.append((current_well_id, start_i, end_i, start_j, end_j))
                 current_well_id += 1
         
-        # Region C: (12,0) から (19,19) → 4x4の井戸
+        # Region C: (12,0) to (19,19) -> 4x4 wells
         region_C_size = 4
         for r_offset in range(12, 20, region_C_size):
             for c_offset in range(0, 20, region_C_size):
@@ -96,7 +96,7 @@ class PaintMixer:
         self.well_usage = [False] * self.total_wells
         self.well_last_target_idx = [-1] * self.total_wells
 
-        # 井戸の構築と設定に基づく壁の配置
+        # Build wells and place walls based on configurations
         for well_id, start_i, end_i, start_j, end_j in self.well_configs:
             well_cells = set()
             for r_idx in range(start_i, end_i):
@@ -106,13 +106,13 @@ class PaintMixer:
             
             self.wells[well_id] = {'cells': well_cells, 'color': (0.0, 0.0, 0.0), 'amount': 0.0}
             
-            # 井戸の境界に壁を配置する
-            # 右側に垂直の壁を配置
+            # Place walls at well boundaries
+            # Vertical walls to the right
             for r_idx in range(start_i, end_i):
                 if end_j < self.N: 
                     self.v_walls[r_idx][end_j - 1] = 1 
 
-            # 下側に水平の壁を配置
+            # Horizontal walls below
             for c_idx in range(start_j, end_j):
                 if end_i < self.N: 
                     self.h_walls[end_i - 1][c_idx] = 1 
@@ -129,7 +129,7 @@ class PaintMixer:
             return False
         self.operations.append(op_str)
         self.turns_used += 1
-        if op_type == 2:  # 塗料取得操作 (TAKE_PAINT)
+        if op_type == 2: # TAKE_PAINT
             self.paint_taken_count += 1
         return True
 
@@ -154,7 +154,7 @@ class PaintMixer:
         if well['amount'] > self.EPS:
             rep_cell = next(iter(well['cells']))
             r_idx, c_idx = rep_cell
-            if self._add_op(f"3 {r_idx} {c_idx}", 3):
+            if self._add_op(f"3 {r_idx} {c_idx}", 3): 
                 well['amount'] = 0.0
                 well['color'] = (0.0, 0.0, 0.0)
                 return True
@@ -165,8 +165,8 @@ class PaintMixer:
         rep_cell = next(iter(well['cells']))
         r_idx, c_idx = rep_cell
         
-        # 重要: 井戸の最大容量はセル数に基づく
-        max_well_capacity = float(len(well['cells']))
+        # Crucial change: max_well_capacity is now based on number of cells
+        max_well_capacity = float(len(well['cells'])) 
         current_amount = well['amount']
         
         if current_amount >= max_well_capacity - self.EPS:
@@ -176,7 +176,7 @@ class PaintMixer:
         if actual_add_amount < self.EPS:
              return False
 
-        if not self._add_op(f"1 {r_idx} {c_idx} {tube_idx}", 1):
+        if not self._add_op(f"1 {r_idx} {c_idx} {tube_idx}", 1): 
             return False
 
         tube_color = self.tubes[tube_idx]
@@ -196,12 +196,12 @@ class PaintMixer:
         if well['amount'] < self.TAKE_THRESHOLD:
             return False
         
-        if not self._add_op(f"2 {r_idx} {c_idx}", 2):
+        if not self._add_op(f"2 {r_idx} {c_idx}", 2): 
             return False
 
         if well['amount'] >= 1.0:
             well['amount'] -= 1.0
-        else:
+        else: 
             well['amount'] = 0.0
         
         if well['amount'] < self.EPS:
@@ -213,13 +213,13 @@ class PaintMixer:
         target_color = self.targets[target_idx]
         start_well_search_idx = target_idx % self.total_wells 
 
-        # 優先度1: 完全に空で未使用の井戸
+        # Priority 1: Completely empty and unused well
         for i in range(self.total_wells):
             well_id = (start_well_search_idx + i) % self.total_wells
             if not self.well_usage[well_id] and self.wells[well_id]['amount'] < self.EPS:
                 return well_id, "empty"
         
-        # 優先度2: 再利用可能な井戸（十分な塗料があり、ターゲットに近いもの、使用中でないもの）
+        # Priority 2: Reusable well (enough paint, close to target, not in use)
         best_reusable_well_id = -1
         min_dist_for_reusable = float('inf')
         for i in range(self.total_wells):
@@ -233,27 +233,27 @@ class PaintMixer:
         if best_reusable_well_id != -1:
             return best_reusable_well_id, "reuse"
 
-        # 優先度3: 井戸のクリア。最も古く使われた井戸 (LRU) を選択
+        # Priority 3: Clear a well. Choose one that was used least recently (LRU)
         chosen_clear_well_id = -1
         least_recent_target_idx = self.H + 1 
         
         for i in range(self.total_wells):
             well_id = (start_well_search_idx + i) % self.total_wells
-            if not self.well_usage[well_id]:  # 現在使用中でない
+            if not self.well_usage[well_id]: # Not currently active
                 if self.well_last_target_idx[well_id] < least_recent_target_idx:
                     least_recent_target_idx = self.well_last_target_idx[well_id]
                     chosen_clear_well_id = well_id
         
         if chosen_clear_well_id != -1:
-             return chosen_clear_well_id, "clear_and_use"
+             return chosen_clear_well_id, "clear_and_use" 
         else:
-             # フォールバック: すべての井戸が現在使用中（これは珍しいケース）
+             # Fallback: All wells are currently marked as in_use (should be rare)
              return start_well_search_idx, "force_clear_and_use"
 
     def allocate_op1_tubes_greedy(self, well_id: int, target_color: Tuple[float, float, float], num_op1_budget: int, 
                                   sim_current_color: Tuple[float, float, float], sim_current_amount: float) -> List[int]:
         
-        max_well_capacity = float(len(self.wells[well_id]['cells']))  # セル数による容量
+        max_well_capacity = float(len(self.wells[well_id]['cells'])) # Capacity by cell count
         tubes_to_add_sequence = []
 
         for _ in range(num_op1_budget):
@@ -265,7 +265,7 @@ class PaintMixer:
 
             for t_idx, tube_c_data_candidate in enumerate(self.tubes):
                 sim_add_amount = min(1.0, max_well_capacity - sim_current_amount)
-                if sim_add_amount < self.EPS:
+                if sim_add_amount < self.EPS: 
                     continue 
 
                 mixed_c_sim = self.mix_colors(sim_current_color, sim_current_amount, 
@@ -285,50 +285,50 @@ class PaintMixer:
                 break 
         return tubes_to_add_sequence
 
+
     def create_target_color(self, target_idx: int):
         target_color = self.targets[target_idx]
 
-        # --- ターン予算の策定 ---
+        # --- Turn Budget Planning ---
         remaining_targets_to_make = self.H - self.paint_taken_count 
         turns_left_total = self.T - self.turns_used
         
         if turns_left_total <= 0 or remaining_targets_to_make <= 0:
             return 
 
-        budget_this_target_ops = 1  # Op2用に最低1ターン
+        budget_this_target_ops = 1 # Min 1 turn for Op2
         
         available_for_non_op2 = turns_left_total - remaining_targets_to_make
         if available_for_non_op2 > 0 and remaining_targets_to_make > 0:
             budget_this_target_ops += math.floor(available_for_non_op2 / remaining_targets_to_make)
         
-        if target_idx == self.H - 1:  # 最後のターゲットは残りターン全てを使用可能
+        if target_idx == self.H - 1: # Last target can use all remaining turns
             budget_this_target_ops = turns_left_total
         
-        budget_this_target_ops = max(1, budget_this_target_ops)
-        budget_this_target_ops = min(budget_this_target_ops, turns_left_total)
+        budget_this_target_ops = max(1, budget_this_target_ops) 
+        budget_this_target_ops = min(budget_this_target_ops, turns_left_total) 
 
-        # --- 使用する井戸の選択と準備 ---
+        # --- Well Selection and Preparation ---
         well_id, well_state_type = self.find_available_well_for_target(target_idx)
-        turns_spent_locally = 0
+        turns_spent_locally = 0 
 
         if well_state_type in ["clear_and_use", "force_clear_and_use"]:
-            min_ops_after_clear = 1  # 塗料抽出用に1ターン
-            if self.wells[well_id]['amount'] < self.TAKE_THRESHOLD or well_state_type == "force_clear_and_use":
-                min_ops_after_clear += 1  # 井戸が空または状態が悪い場合、最低1回の加える操作が必要
+            min_ops_after_clear = 1 # For take
+            if self.wells[well_id]['amount'] < self.TAKE_THRESHOLD or well_state_type == "force_clear_and_use": 
+                min_ops_after_clear +=1 # Need at least one Op1 after clearing an empty/bad well
 
-            if budget_this_target_ops - turns_spent_locally >= (1 + min_ops_after_clear):  # 1はクリア操作用
+            if budget_this_target_ops - turns_spent_locally >= (1 + min_ops_after_clear): # 1 for clear
                 if self.clear_well(well_id):
                     turns_spent_locally += 1
-                else:
-                    return 
+                else: return 
             else:
                 return 
         
         self.well_usage[well_id] = True 
 
-        # --- 塗料追加操作 (Op1) ---
-        num_op1_allowed = budget_this_target_ops - turns_spent_locally - 1  # Op2のために-1
-        num_op1_allowed = max(0, num_op1_allowed)
+        # --- Paint Addition Operations (Op1) ---
+        num_op1_allowed = budget_this_target_ops - turns_spent_locally - 1 # -1 for Op2
+        num_op1_allowed = max(0, num_op1_allowed) 
 
         tubes_to_add = self.allocate_op1_tubes_greedy(well_id, target_color, num_op1_allowed,
                                                       self.wells[well_id]['color'], self.wells[well_id]['amount'])
@@ -336,21 +336,22 @@ class PaintMixer:
         for tube_idx_to_add in tubes_to_add:
             if self.add_paint(well_id, tube_idx_to_add):
                 turns_spent_locally += 1
-            else:
+            else: 
                 break 
         
-        # --- 塗料抽出操作 (Op2) ---
-        if budget_this_target_ops - turns_spent_locally >= 1:  # 少なくとも1ターンはOp2用
+        # --- Paint Extraction (Op2) ---
+        if budget_this_target_ops - turns_spent_locally >= 1: # At least 1 turn for Op2
             if self.wells[well_id]['amount'] < self.TAKE_THRESHOLD:
-                if budget_this_target_ops - turns_spent_locally >= 2:  # 加える操作用にさらに1ターン必要
-                    if self.wells[well_id]['amount'] < float(len(self.wells[well_id]['cells'])) - self.EPS:  # 容量チェック
-                        if self.add_paint(well_id, 0):  # 緊急的にチューブ0で追加
+                 if budget_this_target_ops - turns_spent_locally >= 2: # Need 1 more turn for add
+                    if self.wells[well_id]['amount'] < float(len(self.wells[well_id]['cells'])) - self.EPS: # Capacity check
+                        if self.add_paint(well_id, 0): # Emergency add with tube 0
                             turns_spent_locally += 1
+            
             if budget_this_target_ops - turns_spent_locally >= 1:
-                if self.extract_paint(well_id):
-                    turns_spent_locally += 1
-                else:
-                    pass
+                 if self.extract_paint(well_id):
+                    turns_spent_locally +=1 
+                 else:
+                    pass 
         else:
             pass 
 
@@ -364,21 +365,19 @@ class PaintMixer:
         
         for target_idx_loop in range(self.H):
             if self.turns_used + (self.H - self.paint_taken_count) > self.T:
-                break 
+                 break 
             self.create_target_color(target_idx_loop)
         
         emergency_well_idx_counter = 0
         while self.paint_taken_count < self.H and self.turns_used < self.T:
             current_well_id_emergency = emergency_well_idx_counter % self.total_wells
             
-            turns_for_this_emergency = 1
+            turns_for_this_emergency = 1 
             needs_add = self.wells[current_well_id_emergency]['amount'] < self.TAKE_THRESHOLD
             needs_clear = self.wells[current_well_id_emergency]['amount'] > self.EPS and needs_add 
 
-            if needs_add:
-                turns_for_this_emergency += 1 
-            if needs_clear:
-                turns_for_this_emergency += 1 
+            if needs_add: turns_for_this_emergency += 1 
+            if needs_clear: turns_for_this_emergency += 1 
             
             if self.T - self.turns_used < turns_for_this_emergency:
                 break 
@@ -387,14 +386,14 @@ class PaintMixer:
                 self.clear_well(current_well_id_emergency)
             
             if self.wells[current_well_id_emergency]['amount'] < self.TAKE_THRESHOLD:
-                self.add_paint(current_well_id_emergency, 0)
+                 self.add_paint(current_well_id_emergency, 0) 
             
             self.extract_paint(current_well_id_emergency)
             
             if self.wells[current_well_id_emergency]['amount'] < self.EPS:
-                self.well_usage[current_well_id_emergency] = False 
+                 self.well_usage[current_well_id_emergency] = False 
             
-            self.well_last_target_idx[current_well_id_emergency] = self.H  # 緊急使用としてマーク
+            self.well_last_target_idx[current_well_id_emergency] = self.H # Mark as used by emergency
             emergency_well_idx_counter += 1
 
         for op_str_final in self.operations:
